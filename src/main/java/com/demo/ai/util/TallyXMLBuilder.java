@@ -4,66 +4,58 @@ public class TallyXMLBuilder {
 
     public static String vendorXML(String companyName, String vendorId, String vendorName) {
         return """
-    <ENVELOPE>
-     <HEADER>
-      <TALLYREQUEST>Import Data</TALLYREQUEST>
-     </HEADER>
-     <BODY>
-      <IMPORTDATA>
-       <REQUESTDESC>
-        <REPORTNAME>All Masters</REPORTNAME>
-        <STATICVARIABLES>
-         <SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY>
-        </STATICVARIABLES>
-       </REQUESTDESC>
-       <REQUESTDATA>
-        <TALLYMESSAGE>
-         <LEDGER NAME="%s" ACTION="Create">
-          <ALIAS>%s</ALIAS>
-          <PARENT>Sundry Creditors</PARENT>
-          <ISBILLWISEON>Yes</ISBILLWISEON>
-         </LEDGER>
-        </TALLYMESSAGE>
-       </REQUESTDATA>
-      </IMPORTDATA>
-     </BODY>
-    </ENVELOPE>
-    """.formatted(companyName, vendorName, vendorId);
+<ENVELOPE>
+ <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
+ <BODY>
+  <IMPORTDATA>
+   <REQUESTDESC>
+    <REPORTNAME>All Masters</REPORTNAME>
+    <STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY></STATICVARIABLES>
+   </REQUESTDESC>
+   <REQUESTDATA>
+    <TALLYMESSAGE xmlns:UDF="TallyUDF">
+     <LEDGER NAME="%s" ACTION="Create">
+      <NAME>%s</NAME>
+      <PARENT>Sundry Creditors</PARENT>
+      <OPENINGBALANCE>0</OPENINGBALANCE>
+      <ISBILLWISEON>Yes</ISBILLWISEON>
+     </LEDGER>
+    </TALLYMESSAGE>
+   </REQUESTDATA>
+  </IMPORTDATA>
+ </BODY>
+</ENVELOPE>
+""".formatted(companyName, vendorName, vendorName);
     }
 
     public static String invoiceXML(String companyName, String vendorName, double amount) {
         return """
     <ENVELOPE>
-     <HEADER>
-      <TALLYREQUEST>Import Data</TALLYREQUEST>
-     </HEADER>
+     <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
      <BODY>
       <IMPORTDATA>
        <REQUESTDESC>
         <REPORTNAME>Vouchers</REPORTNAME>
-        <STATICVARIABLES>
-         <SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY>
-        </STATICVARIABLES>
+        <STATICVARIABLES><SVCURRENTCOMPANY>%s</SVCURRENTCOMPANY></STATICVARIABLES>
        </REQUESTDESC>
        <REQUESTDATA>
-        <TALLYMESSAGE>
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
          <VOUCHER VCHTYPE="Purchase" ACTION="Create">
-          <DATE>20260206</DATE>
+          <DATE>20260401</DATE> 
           <VOUCHERTYPENAME>Purchase</VOUCHERTYPENAME>
           <PARTYLEDGERNAME>%s</PARTYLEDGERNAME>
-
+          
           <ALLLEDGERENTRIES.LIST>
            <LEDGERNAME>%s</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-           <AMOUNT>-%.2f</AMOUNT>
+           <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+           <AMOUNT>%.2f</AMOUNT> 
           </ALLLEDGERENTRIES.LIST>
 
           <ALLLEDGERENTRIES.LIST>
            <LEDGERNAME>Purchase</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-           <AMOUNT>%.2f</AMOUNT>
+           <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+           <AMOUNT>-%.2f</AMOUNT>
           </ALLLEDGERENTRIES.LIST>
-
          </VOUCHER>
         </TALLYMESSAGE>
        </REQUESTDATA>
@@ -72,6 +64,4 @@ public class TallyXMLBuilder {
     </ENVELOPE>
     """.formatted(companyName, vendorName, vendorName, amount, amount);
     }
-
 }
-

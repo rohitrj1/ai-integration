@@ -20,10 +20,12 @@ public class TallyController {
 
     @PostMapping("/push-invoice")
     public ResponseEntity<String> pushInvoice(@RequestBody InvoiceRequest request) {
+        String finalResult = tallyService.pushData(request);
 
-        tallyService.createVendor(request);
-        tallyService.createInvoice(request);
-
-        return ResponseEntity.ok("Vendor and Invoice stored in Tally");
+        if(finalResult.contains("<CREATED>1</CREATED>")) {
+            return ResponseEntity.ok("Success: Data Synced to Tally!");
+        } else {
+            return ResponseEntity.status(500).body("Tally Response: " + finalResult);
+        }
     }
 }
