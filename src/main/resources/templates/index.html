@@ -75,7 +75,7 @@
         $("#chat-window").scrollTop($("#chat-window")[0].scrollHeight);
 
         // AJAX POST Call
-        $.post("/chat", { q: q }, function(data) {
+        $.post("/api/ai/chat", { q: q }, function(data) {
             // Error Fix: Selector mein quotes aur ID format sahi kiya
             $(`#${thinkingId}`).remove();
 
