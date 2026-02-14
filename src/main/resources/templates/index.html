@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>NutriTap AI Support</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* NutriTap Branding - Medium Green */
+        .bg-nutritap { background-color: #22c55e; }
+        .text-nutritap { color: #22c55e; }
+        .border-nutritap { border-color: #22c55e; }
+
+        /* Thinking Animation */
+        .dot-blink {
+            animation: blink 1.4s infinite both;
+            display: inline-block;
+            width: 5px; height: 5px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            margin: 0 2px;
+        }
+        .dot-blink:nth-child(2) { animation-delay: 0.2s; }
+        .dot-blink:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes blink {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col h-[650px] overflow-hidden border border-gray-100">
+    <div class="bg-nutritap p-5 text-white flex items-center gap-4 shadow-md">
+        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center font-extrabold text-nutritap shadow-sm text-lg">NT</div>
+        <div>
+            <h1 class="font-bold text-lg tracking-wide">NutriTap Assistant</h1>
+            <p class="text-[10px] opacity-90 uppercase tracking-widest font-semibold">Healthy Retail AI</p>
+        </div>
+    </div>
+
+    <div id="chat-window" class="flex-1 p-5 overflow-y-auto space-y-4 bg-[#fcfdfc] flex flex-col scroll-smooth">
+        <div class="bg-white p-4 rounded-2xl rounded-bl-none self-start max-w-[85%] text-gray-800 text-sm shadow-sm border border-gray-100">
+            Namaste! 🙏 Welcome to NutriTap. How can I help you with our smart kiosks today?
+        </div>
+    </div>
+
+    <div class="p-4 bg-white border-t border-gray-100 flex gap-3 items-center">
+        <input type="text" id="userInput" class="flex-1 bg-gray-100 border-none rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-green-500 text-sm" placeholder="Ask about vending machines...">
+        <button onclick="send()" class="bg-nutritap text-white p-3 rounded-full hover:opacity-90 shadow-lg transition-all transform active:scale-95">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+        </button>
+    </div>
+</div>
+
+<script>
+    function send() {
+        let q = $('#userInput').val();
+        if(!q.trim()) return;
+
+        // User Message - Yahan backticks (`) use kiye hain
+        $('#chat-window').append(`<div class="bg-nutritap text-white p-3 rounded-2xl rounded-br-none self-end max-w-[85%] text-sm shadow-md mb-1">${q}</div>`);
+        $('#userInput').val('');
+
+        // Thinking Indicator
+        let thinkingId = "think-" + Date.now();
+        $('#chat-window').append(`
+            <div id="${thinkingId}" class="bg-white p-3 rounded-2xl rounded-bl-none self-start flex items-center gap-3 shadow-sm border border-gray-100">
+                <div class="flex items-center">
+                    <span class="dot-blink"></span><span class="dot-blink"></span><span class="dot-blink"></span>
+                </div>
+                <span class="text-xs text-green-600 font-medium italic">NutriTap AI is thinking...</span>
+            </div>
+        `);
+        $("#chat-window").scrollTop($("#chat-window")[0].scrollHeight);
+
+        // AJAX POST Call
+        $.post("/chat", { q: q }, function(data) {
+            // Error Fix: Selector mein quotes aur ID format sahi kiya
+            $(`#${thinkingId}`).remove();
+
+            // Error Fix: Append string ke liye backticks (`) use kiye
+            $('#chat-window').append(`<div class="bg-white p-4 rounded-2xl rounded-bl-none self-start max-w-[85%] text-gray-700 text-sm border-l-4 border-nutritap shadow-sm">${data}</div>`);
+            $("#chat-window").scrollTop($("#chat-window")[0].scrollHeight);
+        }).fail(function() {
+            // Extra Safety: Agar server down ho toh thinking indicator hata do
+            $(`#${thinkingId}`).html("<span class='text-red-500 text-xs px-2'>Server error!</span>");
+        });
+    }
+
+    // Enter Key Support
+    $('#userInput').on('keypress', function(e) {
+        if(e.which == 13) send();
+    });
+</script>
