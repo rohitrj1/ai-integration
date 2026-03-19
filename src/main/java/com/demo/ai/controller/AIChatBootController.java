@@ -8,7 +8,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 
 @RestController
-@RequestMapping("/api/ai")
+//@RequestMapping("/api/ai")
 public class AIChatBootController {
 
     @Autowired
@@ -26,7 +26,7 @@ public class AIChatBootController {
         return ResponseEntity.ok("Bot memory refreshed successfully!");
     }
 
-    @GetMapping("/index")
+    @GetMapping("")
     public ModelAndView index() {
         return new ModelAndView("index"); // Ye 'templates/index.html' ko dhoondega
     }

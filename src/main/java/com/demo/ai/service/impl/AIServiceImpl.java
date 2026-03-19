@@ -10,6 +10,10 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.security.cert.X509Certificate;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -56,26 +60,33 @@ public class AIServiceImpl implements AIService {
     }
 
     private void crawlWebsite(String url, Set<String> visited, StringBuilder data, int depth) {
-        // 25 pages ki limit kaafi hai, lekin depth 2-3 honi chahiye
-        if (depth > 2 || visited.contains(url) || visited.size() > 30) return;
+        // Exclude images, PDFs, and social media to save tokens
+        if (depth > 2 || visited.contains(url) || visited.size() > 25 || url.matches(".*\\.(jpg|png|pdf|zip)$")) return;
 
         try {
             visited.add(url);
-            System.out.println("DEBUG: Scanning -> " + url); // Isse console mein dekho kya scan ho raha hai
+            Document doc = Jsoup.connect(url)
+                    .sslSocketFactory(socketFactory())
+                    .userAgent("NutriBot-Scanner/1.0")
+                    .timeout(10000)
+                    .get();
 
-            Document doc = Jsoup.connect(url).timeout(5000).get();
-            Elements content = doc.select("h1, h2, h3, p, li");
+            // Select more specific content to avoid garbage data (headers/footers)
+            Elements content = doc.select("article, main, h1, h2, p");
 
-            data.append("\nSource: ").append(url).append("\n");
-            content.forEach(e -> data.append(e.text()).append(" "));
+            data.append("\n[Page: ").append(url).append("]\n");
+            for (Element e : content) {
+                String text = e.text().trim();
+                if (text.length() > 20) { // Avoid tiny fragments
+                    data.append(text).append(" ");
+                }
+            }
 
-            // Saare links nikalna
             Elements links = doc.select("a[href]");
             for (Element link : links) {
-                String nextUrl = link.attr("abs:href"); // absolute URL lega
-
-                // Strict check: Sirf nutritap.in ke pages, koi social media ya bahar ka link nahi
-                if (nextUrl.contains("nutritap.in") && !nextUrl.contains("#") && !visited.contains(nextUrl)) {
+                String nextUrl = link.attr("abs:href");
+                // Ensure we stay on the domain and avoid "mailto" or "tel" links
+                if (nextUrl.startsWith(baseUrl) && !nextUrl.contains("#") && !visited.contains(nextUrl)) {
                     crawlWebsite(nextUrl, visited, data, depth + 1);
                 }
             }
@@ -84,8 +95,53 @@ public class AIServiceImpl implements AIService {
         }
     }
 
+//    private void crawlWebsite(String url, Set<String> visited, StringBuilder data, int depth) {
+//        // 25 pages ki limit kaafi hai, lekin depth 2-3 honi chahiye
+//        if (depth > 2 || visited.contains(url) || visited.size() > 30) return;
+//
+//        try {
+//            visited.add(url);
+//            System.out.println("DEBUG: Scanning -> " + url); // Isse console mein dekho kya scan ho raha hai
+//
+//            Document doc = Jsoup.connect(url).timeout(5000).get();
+//            Elements content = doc.select("h1, h2, h3, p, li");
+//
+//            data.append("\nSource: ").append(url).append("\n");
+//            content.forEach(e -> data.append(e.text()).append(" "));
+//
+//            // Saare links nikalna
+//            Elements links = doc.select("a[href]");
+//            for (Element link : links) {
+//                String nextUrl = link.attr("abs:href"); // absolute URL lega
+//
+//                // Strict check: Sirf nutritap.in ke pages, koi social media ya bahar ka link nahi
+//                if (nextUrl.contains("nutritap.in") && !nextUrl.contains("#") && !visited.contains(nextUrl)) {
+//                    crawlWebsite(nextUrl, visited, data, depth + 1);
+//                }
+//            }
+//        } catch (Exception e) {
+//            System.err.println("Error crawling " + url + ": " + e.getMessage());
+//        }
+//    }
+
     @Override
     public String getChatResponse(String query) {
         return chatClient.prompt().user(query).call().content();
+    }
+
+    private static javax.net.ssl.SSLSocketFactory socketFactory() {
+        try {
+            TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() { return null; }
+                public void checkClientTrusted(X509Certificate[] certs, String authType) { }
+                public void checkServerTrusted(X509Certificate[] certs, String authType) { }
+            }};
+
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            return sc.getSocketFactory();
+        } catch (Exception e) {
+            return (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+        }
     }
 }
