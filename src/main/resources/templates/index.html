@@ -1,95 +1,878 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <title>NutriTap AI Support</title>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>NutriTap Support</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet"/>
     <style>
-        /* NutriTap Branding - Medium Green */
-        .bg-nutritap { background-color: #22c55e; }
-        .text-nutritap { color: #22c55e; }
-        .border-nutritap { border-color: #22c55e; }
-
-        /* Thinking Animation */
-        .dot-blink {
-            animation: blink 1.4s infinite both;
-            display: inline-block;
-            width: 5px; height: 5px;
-            background-color: #22c55e;
-            border-radius: 50%;
-            margin: 0 2px;
+        :root {
+            --g: #15803d; --gm: #16a34a; --gl: #22c55e;
+            --gs: #dcfce7; --gb: #f0fdf4;
+            --ink: #1a2e1d; --muted: #5a7a60; --border: #d1fae5;
         }
-        .dot-blink:nth-child(2) { animation-delay: 0.2s; }
-        .dot-blink:nth-child(3) { animation-delay: 0.4s; }
-
-        @keyframes blink {
-            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-            40% { opacity: 1; transform: scale(1.2); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0c1a0e;
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center; padding: 1rem;
         }
+
+        /* ── SHELL ── */
+        .shell {
+            width: 100%; max-width: 460px; height: 720px;
+            background: #fff; border-radius: 28px;
+            box-shadow: 0 0 0 1px rgba(21,128,61,.15), 0 32px 80px rgba(12,26,14,.5);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* ── HEADER ── */
+        .hdr {
+            background: linear-gradient(135deg,#0f5c29,#166534,#15803d);
+            padding: 16px 18px 14px;
+            display: flex; align-items: center; gap: 12px; flex-shrink: 0; position: relative;
+        }
+        .hdr::after {
+            content: ''; position: absolute; right: -30px; top: -30px;
+            width: 120px; height: 120px;
+            background: radial-gradient(circle,rgba(34,197,94,.18),transparent 70%);
+            pointer-events: none;
+        }
+        .hdr-av {
+            width: 44px; height: 44px;
+            background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.25);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0;
+        }
+        .hdr-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; color: #fff; }
+        .hdr-status { font-size: 11px; color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+        .pulse { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.4)} 70%{box-shadow:0 0 0 5px rgba(74,222,128,0)} }
+        .hdr-actions { margin-left: auto; display: flex; gap: 6px; }
+        .hdr-btn {
+            width: 32px; height: 32px; background: rgba(255,255,255,.12);
+            border: none; border-radius: 50%; color: #fff; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: .2s;
+        }
+        .hdr-btn:hover { background: rgba(255,255,255,.22); }
+
+        /* ── CHAT AREA ── */
+        #chatWin {
+            flex: 1; overflow-y: auto; padding: 16px;
+            background: linear-gradient(180deg,#f8fffe,#f0fdf4);
+            display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth;
+        }
+        #chatWin::-webkit-scrollbar { width: 3px; }
+        #chatWin::-webkit-scrollbar-thumb { background: #bbf7d0; border-radius: 4px; }
+
+        /* ── MESSAGES ── */
+        .row-bot { display: flex; gap: 8px; align-items: flex-end; align-self: flex-start; max-width: 92%; }
+        .mini-av {
+            width: 28px; height: 28px; background: var(--gs); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; color: var(--g); flex-shrink: 0;
+        }
+        .bubble-bot {
+            background: #fff; border: 1.5px solid #e2f3e8;
+            padding: 12px 15px; border-radius: 18px 18px 18px 4px;
+            font-size: 13.5px; line-height: 1.6; color: var(--ink);
+            box-shadow: 0 2px 8px rgba(21,128,61,.06);
+        }
+        .row-user { align-self: flex-end; max-width: 80%; }
+        .bubble-user {
+            background: linear-gradient(135deg,var(--g),var(--gm));
+            color: #fff; padding: 11px 15px; border-radius: 18px 18px 4px 18px;
+            font-size: 13.5px; line-height: 1.55;
+            box-shadow: 0 4px 14px rgba(21,128,61,.3);
+        }
+        .ts { font-size: 10px; color: #94a3b8; margin-top: 3px; }
+        .ts.l { padding-left: 36px; }
+
+        /* ── 3 MENU CARDS ── */
+        .menu3 { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+        .mcard {
+            background: #fff; border: 1.5px solid #d1fae5; border-radius: 14px;
+            padding: 14px 16px; cursor: pointer;
+            display: flex; align-items: center; gap: 14px;
+            transition: all .22s ease; position: relative; overflow: hidden;
+        }
+        .mcard::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+            background: var(--gl); transform: scaleY(0); transform-origin: center; transition: .22s;
+        }
+        .mcard:hover { border-color: var(--gm); background: var(--gb); transform: translateX(3px); box-shadow: 0 4px 18px rgba(21,128,61,.1); }
+        .mcard:hover::before { transform: scaleY(1); }
+        .mcard-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+        .mcard-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--ink); }
+        .mcard-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .mcard-arr { color: var(--muted); font-size: 18px; margin-left: auto; transition: .2s; }
+        .mcard:hover .mcard-arr { color: var(--gm); transform: translateX(2px); }
+
+        /* ── CHIPS ── */
+        .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+        .chip {
+            background: #fff; border: 1.5px solid var(--border); color: var(--g);
+            font-size: 12px; font-weight: 500; padding: 6px 13px; border-radius: 22px;
+            cursor: pointer; transition: all .2s; white-space: nowrap;
+        }
+        .chip:hover { background: var(--g); color: #fff; border-color: var(--g); }
+        .chip.red   { border-color: #fecaca; color: #dc2626; }
+        .chip.red:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+        .chip.amber { border-color: #fde68a; color: #d97706; }
+        .chip.amber:hover { background: #d97706; color: #fff; border-color: #d97706; }
+
+        /* ── STEP CARDS ── */
+        .scard { background: #fff; border: 1.5px solid #d1fae5; border-radius: 16px; padding: 16px; margin-top: 2px; }
+        .scard-title {
+            font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13.5px;
+            color: var(--ink); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+        }
+        .step-badge { font-size: 10px; background: var(--gs); color: var(--g); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+        .finput {
+            width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px;
+            padding: 10px 13px; font-size: 13px; font-family: 'Outfit', sans-serif;
+            outline: none; transition: .2s; background: #fafafa; color: var(--ink); margin-bottom: 8px;
+        }
+        .finput:focus { border-color: var(--gm); background: #fff; }
+        .fbtn {
+            width: 100%; background: linear-gradient(135deg,var(--g),var(--gm));
+            color: #fff; border: none; border-radius: 10px; padding: 11px;
+            font-size: 13.5px; font-weight: 600; cursor: pointer;
+            font-family: 'Outfit', sans-serif; transition: opacity .2s; margin-top: 4px;
+        }
+        .fbtn:hover { opacity: .88; }
+
+        /* ── UPLOAD ZONE ── */
+        .upload-zone {
+            border: 2px dashed #86efac; border-radius: 12px;
+            background: #f0fdf4; padding: 20px; text-align: center;
+            cursor: pointer; transition: all .2s; position: relative;
+        }
+        .upload-zone:hover, .upload-zone.drag { border-color: var(--gm); background: #dcfce7; }
+        .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .preview-wrap { position: relative; margin-top: 10px; display: none; }
+        .preview-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); max-height: 160px; object-fit: cover; }
+        .preview-del {
+            position: absolute; top: 6px; right: 6px;
+            background: #ef4444; color: #fff; border: none; border-radius: 50%;
+            width: 22px; height: 22px; cursor: pointer; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .progress-bar { height: 3px; background: #e2e8f0; border-radius: 3px; margin-top: 8px; overflow: hidden; display: none; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg,var(--g),var(--gl)); width: 0; transition: width .4s ease; }
+
+        /* ── OCR STATUS ── */
+        .ocr-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 5px 0; }
+        .ocr-spin { width: 12px; height: 12px; border: 2px solid #d1fae5; border-top-color: var(--gm); border-radius: 50%; animation: spin .7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── TICKET CARD ── */
+        .tcard { background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 14px; padding: 14px; margin-top: 4px; }
+        .tbadge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: var(--gm); color: #fff; font-size: 10px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; letter-spacing: .4px;
+        }
+        .trow { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--ink); padding: 5px 0; border-bottom: 1px solid #d1fae5; }
+        .trow:last-child { border-bottom: none; }
+        .tlabel { color: var(--muted); }
+        .status-ok { color: var(--gm); font-weight: 600; }
+        .status-warn { color: #d97706; font-weight: 600; }
+
+        /* ── AGENT CARD ── */
+        .agent-card {
+            background: linear-gradient(135deg,#fffbeb,#fef3c7);
+            border: 1.5px solid #fde68a; border-radius: 14px;
+            padding: 14px; display: flex; gap: 12px; align-items: flex-start; margin-top: 2px;
+        }
+        .agent-card h4 { font-family: 'Syne', sans-serif; font-size: 13.5px; font-weight: 700; color: #92400e; margin-bottom: 4px; }
+        .agent-card p  { font-size: 12px; color: #b45309; line-height: 1.5; margin-bottom: 8px; }
+        .agent-btn { background: #f59e0b; color: #fff; border: none; border-radius: 9px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Outfit', sans-serif; }
+        .agent-btn:hover { background: #d97706; }
+
+        /* ── KIOSK INFO ── */
+        .ki-card { background: #fff; border: 1.5px solid #d1fae5; border-radius: 14px; padding: 14px; margin-top: 4px; }
+        .ki-card h4 { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+        .ki-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f0fdf4; font-size: 12.5px; color: var(--ink); }
+        .ki-row:last-child { border-bottom: none; }
+        .ki-icon { width: 28px; height: 28px; background: var(--gs); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+
+        /* ── THINKING ── */
+        .thinking {
+            display: flex; align-items: center; gap: 6px; padding: 10px 14px;
+            background: #fff; border: 1.5px solid #e2f3e8;
+            border-radius: 18px 18px 18px 4px;
+            box-shadow: 0 2px 8px rgba(21,128,61,.06); align-self: flex-start;
+        }
+        .dot { width: 7px; height: 7px; background: var(--gl); border-radius: 50%; display: inline-block; animation: blink 1.4s infinite both; }
+        .dot:nth-child(2) { animation-delay: .2s; }
+        .dot:nth-child(3) { animation-delay: .4s; }
+        @keyframes blink { 0%,80%,100%{opacity:.2;transform:scale(.7)} 40%{opacity:1;transform:scale(1.1)} }
+        .think-lbl { font-size: 11px; color: var(--g); font-weight: 500; font-style: italic; }
+
+        /* ── REFRESH STRIP ── */
+        .rstrip {
+            background: #dcfce7; border-bottom: 1px solid #bbf7d0;
+            padding: 7px 14px; font-size: 11.5px; color: var(--g);
+            display: none; align-items: center; gap: 8px; flex-shrink: 0;
+        }
+        .rspin { width: 11px; height: 11px; border: 2px solid #bbf7d0; border-top-color: var(--gm); border-radius: 50%; animation: spin .7s linear infinite; }
+
+        /* ── INPUT BAR ── */
+        .input-bar { padding: 12px 14px; background: #fff; border-top: 1px solid #e8f5ec; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .chat-input {
+            flex: 1; background: #f4faf6; border: 1.5px solid #d1fae5; border-radius: 22px;
+            padding: 10px 16px; font-size: 13.5px; font-family: 'Outfit', sans-serif;
+            outline: none; transition: .2s; color: var(--ink);
+            resize: none; max-height: 80px; min-height: 40px; line-height: 1.4;
+        }
+        .chat-input:focus { border-color: var(--gm); background: #fff; }
+        .send-btn {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg,var(--g),var(--gm));
+            border: none; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .2s; flex-shrink: 0; box-shadow: 0 4px 12px rgba(21,128,61,.3);
+        }
+        .send-btn:hover { transform: scale(1.08); }
+        .send-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+        /* ── FOOTER ── */
+        .bot-footer { text-align: center; padding: 5px 0 6px; font-size: 10px; color: #94a3b8; background: #fff; flex-shrink: 0; }
+        .bot-footer span { color: var(--gm); font-weight: 600; }
+
+        /* ── ANIMATIONS ── */
+        .fade { animation: fadeUp .3s ease forwards; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        @media(max-width:480px){ body{padding:0;align-items:flex-end} .shell{max-width:100%;height:100dvh;border-radius:0} }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex items-center justify-center p-4">
+<body>
+<div class="shell">
 
-<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col h-[650px] overflow-hidden border border-gray-100">
-    <div class="bg-nutritap p-5 text-white flex items-center gap-4 shadow-md">
-        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center font-extrabold text-nutritap shadow-sm text-lg">NT</div>
+    <!-- HEADER -->
+    <div class="hdr">
+        <div class="hdr-av">NT</div>
         <div>
-            <h1 class="font-bold text-lg tracking-wide">NutriTap Assistant</h1>
-            <p class="text-[10px] opacity-90 uppercase tracking-widest font-semibold">Healthy Retail AI</p>
+            <div class="hdr-name">NutriTap Support</div>
+            <div class="hdr-status"><span class="pulse"></span>AI Assistant · Always Online</div>
+        </div>
+        <div class="hdr-actions">
+            <button class="hdr-btn" onclick="triggerRefresh()" title="Refresh knowledge">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                </svg>
+            </button>
+            <button class="hdr-btn" onclick="resetHome()" title="Home">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+            </button>
         </div>
     </div>
 
-    <div id="chat-window" class="flex-1 p-5 overflow-y-auto space-y-4 bg-[#fcfdfc] flex flex-col scroll-smooth">
-        <div class="bg-white p-4 rounded-2xl rounded-bl-none self-start max-w-[85%] text-gray-800 text-sm shadow-sm border border-gray-100">
-            Namaste! 🙏 Welcome to NutriTap. How can I help you with our smart kiosks today?
+    <!-- REFRESH STRIP -->
+    <div class="rstrip" id="rStrip"><div class="rspin"></div>Refreshing product knowledge…</div>
+
+    <!-- CHAT WINDOW -->
+    <div id="chatWin">
+        <div class="row-bot fade">
+            <div class="mini-av">NT</div>
+            <div>
+                <div class="bubble-bot">
+                    🙏 <strong>Namaste!</strong> I'm NutriTap's AI Support Assistant.<br/><br/>
+                    I can help with <strong>Refunds</strong>, <strong>Kiosk issues</strong>, <strong>Franchise enquiries</strong>, or answer any <strong>General queries</strong> about NutriTap.
+                </div>
+                <div class="ts l" id="wt"></div>
+                <div class="menu3" style="margin-top:10px">
+                    <div class="mcard" onclick="selectMenu('refund')">
+                        <div class="mcard-icon" style="background:#fef2f2">💰</div>
+                        <div>
+                            <div class="mcard-title">Refund &amp; Billing</div>
+                            <div class="mcard-sub">Payment issues · Upload screenshot · Track refund</div>
+                        </div>
+                        <div class="mcard-arr">›</div>
+                    </div>
+                    <div class="mcard" onclick="selectMenu('kiosk')">
+                        <div class="mcard-icon" style="background:#f0fdf4">🏧</div>
+                        <div>
+                            <div class="mcard-title">Kiosk Support</div>
+                            <div class="mcard-sub">Machine issues · Not dispensing · Technical help</div>
+                        </div>
+                        <div class="mcard-arr">›</div>
+                    </div>
+                    <div class="mcard" onclick="selectMenu('franchise')">
+                        <div class="mcard-icon" style="background:#eff6ff">🤝</div>
+                        <div>
+                            <div class="mcard-title">Franchise Enquiry</div>
+                            <div class="mcard-sub">Partner with us · Investment info · Apply now</div>
+                        </div>
+                        <div class="mcard-arr">›</div>
+                    </div>
+                    <div class="mcard" onclick="selectMenu('general')">
+                        <div class="mcard-icon" style="background:#fdf4ff">💬</div>
+                        <div>
+                            <div class="mcard-title">General Queries</div>
+                            <div class="mcard-sub">Products · Nutrition · How it works · FAQs</div>
+                        </div>
+                        <div class="mcard-arr">›</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="p-4 bg-white border-t border-gray-100 flex gap-3 items-center">
-        <input type="text" id="userInput" class="flex-1 bg-gray-100 border-none rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-green-500 text-sm" placeholder="Ask about vending machines...">
-        <button onclick="send()" class="bg-nutritap text-white p-3 rounded-full hover:opacity-90 shadow-lg transition-all transform active:scale-95">
-            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+    <!-- INPUT BAR -->
+    <div class="input-bar">
+        <textarea id="uInput" class="chat-input" placeholder="Type your question…" rows="1" oninput="autoH(this)"></textarea>
+        <button class="send-btn" id="sBtn" onclick="send()">
+            <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
     </div>
+    <div class="bot-footer">Powered by <span>NutriTap AI</span> · Gemini 2.0 Flash</div>
 </div>
 
 <script>
-    function send() {
-        let q = $('#userInput').val();
-        if(!q.trim()) return;
+    // ═══════════════════════════════════════
+    //  STATE
+    // ═══════════════════════════════════════
+    const sessionId   = 'sess-' + Date.now();
+    let uploadedFile  = null;
+    let uploadedB64   = null;
 
-        // User Message - Yahan backticks (`) use kiye hain
-        $('#chat-window').append(`<div class="bg-nutritap text-white p-3 rounded-2xl rounded-br-none self-end max-w-[85%] text-sm shadow-md mb-1">${q}</div>`);
-        $('#userInput').val('');
+    document.getElementById('wt').textContent = now();
 
-        // Thinking Indicator
-        let thinkingId = "think-" + Date.now();
-        $('#chat-window').append(`
-            <div id="${thinkingId}" class="bg-white p-3 rounded-2xl rounded-bl-none self-start flex items-center gap-3 shadow-sm border border-gray-100">
-                <div class="flex items-center">
-                    <span class="dot-blink"></span><span class="dot-blink"></span><span class="dot-blink"></span>
-                </div>
-                <span class="text-xs text-green-600 font-medium italic">NutriTap AI is thinking...</span>
-            </div>
-        `);
-        $("#chat-window").scrollTop($("#chat-window")[0].scrollHeight);
+    // ═══════════════════════════════════════
+    //  UTILS
+    // ═══════════════════════════════════════
+    function now()  { return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function autoH(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,80)+'px'; }
+    function scroll(){ const w=document.getElementById('chatWin'); w.scrollTop=w.scrollHeight; }
+    function rnd()  { return Math.floor(100000+Math.random()*900000); }
+    function fmt(t) {
+        return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g,'<em>$1</em>')
+            .replace(/\n/g,'<br/>');
+    }
 
-        // AJAX POST Call
-        $.post("/chat", { q: q }, function(data) {
-            // Error Fix: Selector mein quotes aur ID format sahi kiya
-            $(`#${thinkingId}`).remove();
+    // ═══════════════════════════════════════
+    //  RENDER HELPERS
+    // ═══════════════════════════════════════
+    function botMsg(html, showTime=true) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="bubble-bot">${html}</div>
+      ${showTime?`<div class="ts l">${now()}</div>`:''}
+    </div></div>`);
+        scroll();
+    }
 
-            // Error Fix: Append string ke liye backticks (`) use kiye
-            $('#chat-window').append(`<div class="bg-white p-4 rounded-2xl rounded-bl-none self-start max-w-[85%] text-gray-700 text-sm border-l-4 border-nutritap shadow-sm">${data}</div>`);
-            $("#chat-window").scrollTop($("#chat-window")[0].scrollHeight);
-        }).fail(function() {
-            // Extra Safety: Agar server down ho toh thinking indicator hata do
-            $(`#${thinkingId}`).html("<span class='text-red-500 text-xs px-2'>Server error!</span>");
+    function userMsg(txt) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-user fade">
+      <div class="bubble-user">${esc(txt)}</div>
+      <div class="ts" style="text-align:right">${now()}</div>
+    </div>`);
+        scroll();
+    }
+
+    function showThink() {
+        const id = 't'+Date.now();
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div id="${id}" class="thinking fade">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="think-lbl">NutriTap AI is thinking…</span>
+    </div>`);
+        scroll(); return id;
+    }
+    function rmThink(id){ const e=document.getElementById(id); if(e)e.remove(); }
+
+    // ═══════════════════════════════════════
+    //  MENU ROUTING
+    // ═══════════════════════════════════════
+    function selectMenu(type) {
+        const labels = { refund:'💰 Refund & Billing', kiosk:'🏧 Kiosk Support', franchise:'🤝 Franchise Enquiry', general:'💬 General Queries' };
+        userMsg(labels[type]);
+        if      (type==='refund')    showRefundMenu();
+        else if (type==='kiosk')     showKioskMenu();
+        else if (type==='franchise') showFranchiseForm();
+        else if (type==='general')   showGeneralChat();
+    }
+
+    // ═══════════════════════════════════════
+    //  GENERAL CHAT
+    // ═══════════════════════════════════════
+    function showGeneralChat() {
+        botMsg(`💬 <strong>Ask me anything about NutriTap!</strong><br/><br/>
+    You can type your question below, or pick a common topic:
+    <div class="chips" style="margin-top:10px">
+      <div class="chip" onclick="aiQuery('What products does NutriTap sell?')">Our Products</div>
+      <div class="chip" onclick="aiQuery('How does NutriTap kiosk work?')">How it works</div>
+      <div class="chip" onclick="aiQuery('Is NutriTap food healthy and certified?')">Health &amp; Nutrition</div>
+      <div class="chip" onclick="aiQuery('What are NutriTap pricing and plans?')">Pricing</div>
+      <div class="chip" onclick="aiQuery('How do I place an order on NutriTap?')">How to order</div>
+      <div class="chip" onclick="aiQuery('What cities is NutriTap available in?')">Availability</div>
+      <div class="chip" onclick="aiQuery('How do I contact NutriTap support?')">Contact us</div>
+      <div class="chip" onclick="aiQuery('What payment methods does NutriTap accept?')">Payment methods</div>
+    </div>`, false);
+    }
+
+    // ═══════════════════════════════════════
+    //  REFUND FLOW
+    // ═══════════════════════════════════════
+    function showRefundMenu() {
+        botMsg(`I'll help you with a refund. What went wrong?
+    <div class="chips" style="margin-top:10px">
+      <div class="chip red"   onclick="startRefund('Item not received from kiosk')">Item not received</div>
+      <div class="chip red"   onclick="startRefund('Wrong item was dispensed')">Wrong item</div>
+      <div class="chip red"   onclick="startRefund('Charged twice for same order')">Charged twice</div>
+      <div class="chip red"   onclick="startRefund('Product quality issue')">Quality issue</div>
+      <div class="chip"       onclick="aiQuery('What is NutriTap refund policy?')">Refund policy</div>
+    </div>`, false);
+    }
+
+    function startRefund(reason) {
+        userMsg(reason);
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="bubble-bot">
+        <div class="scard-title">💰 Refund Request <span class="step-badge">STEP 1 of 2</span></div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Reason: <strong>${esc(reason)}</strong></p>
+        <input class="finput" id="r-mobile" placeholder="📱 Registered Mobile Number"/>
+
+        <label style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:600;color:var(--ink)">
+          Transaction Screenshot <span style="color:#ef4444">*</span>
+        </label>
+        <div class="upload-zone" id="uZone"
+             ondragover="event.preventDefault();this.classList.add('drag')"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="handleDrop(event)">
+          <input type="file" accept="image/*" onchange="handleFile(this.files[0])" id="fileInp"/>
+          <div style="font-size:28px;margin-bottom:6px">📸</div>
+          <div style="font-size:13px;font-weight:600;color:var(--g)">Tap to upload or drag &amp; drop</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">JPG, PNG, WEBP · Max 10 MB</div>
+        </div>
+        <div class="preview-wrap" id="preWrap">
+          <img id="preImg" class="preview-img" src="" alt="preview"/>
+          <button class="preview-del" onclick="clearUpload()">✕</button>
+        </div>
+        <div class="progress-bar" id="pBar"><div class="progress-fill" id="pFill"></div></div>
+        <button class="fbtn" onclick="submitRefund('${esc(reason)}')" style="margin-top:12px">
+          Continue → Analyse Screenshot
+        </button>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    // File handling
+    function handleDrop(e) {
+        e.preventDefault();
+        document.getElementById('uZone').classList.remove('drag');
+        const f = e.dataTransfer.files[0];
+        if (f) handleFile(f);
+    }
+    function handleFile(f) {
+        if (!f || !f.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
+        if (f.size > 10*1024*1024) { alert('File too large. Max 10 MB.'); return; }
+        uploadedFile = f;
+        const r = new FileReader();
+        r.onload = e => {
+            uploadedB64 = e.target.result.split(',')[1];
+            document.getElementById('preImg').src = e.target.result;
+            document.getElementById('preWrap').style.display = 'block';
+            document.getElementById('uZone').style.display   = 'none';
+        };
+        r.readAsDataURL(f);
+    }
+    function clearUpload() {
+        uploadedFile = null; uploadedB64 = null;
+        document.getElementById('preWrap').style.display = 'none';
+        document.getElementById('uZone').style.display   = 'block';
+        document.getElementById('fileInp').value = '';
+    }
+
+    async function submitRefund(reason) {
+        const mobile = document.getElementById('r-mobile')?.value?.trim();
+        if (!mobile)         { alert('Please enter your mobile number.'); return; }
+        if (!uploadedFile)   { alert('Please upload your transaction screenshot.'); return; }
+
+        userMsg(`Mobile: ${mobile} | Screenshot uploaded ✓`);
+
+        // Progress bar
+        const pBar = document.getElementById('pBar');
+        const pFill = document.getElementById('pFill');
+        pBar.style.display = 'block';
+        let pct = 0;
+        const prog = setInterval(() => { pct = Math.min(pct+8,85); pFill.style.width=pct+'%'; }, 200);
+
+        // OCR status indicators
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade" id="ocrRow"><div class="mini-av">NT</div><div>
+      <div class="bubble-bot">
+        <div class="ocr-row"><div class="ocr-spin"></div>Reading transaction from screenshot…</div>
+        <div class="ocr-row" id="oc2" style="display:none"><div class="ocr-spin"></div>Verifying with payment gateway…</div>
+        <div class="ocr-row" id="oc3" style="display:none"><div class="ocr-spin"></div>Processing refund…</div>
+      </div></div></div>`);
+        scroll();
+        setTimeout(()=>{ const e=document.getElementById('oc2'); if(e)e.style.display='flex'; scroll(); }, 1800);
+        setTimeout(()=>{ const e=document.getElementById('oc3'); if(e)e.style.display='flex'; scroll(); }, 3200);
+
+        try {
+            const form = new FormData();
+            form.append('mobile',     mobile);
+            form.append('reason',     reason);
+            form.append('screenshot', uploadedFile);
+
+            const resp   = await fetch('/refund/process', { method:'POST', body:form });
+            const result = await resp.json();
+
+            clearInterval(prog); pFill.style.width = '100%';
+            setTimeout(() => pBar.style.display = 'none', 500);
+            document.getElementById('ocrRow')?.remove();
+
+            if (result.success)     renderRefundSuccess(result);
+            else if(result.needsManual) renderRefundManual(result);
+            else                    renderRefundFailed(result);
+
+        } catch(err) {
+            clearInterval(prog);
+            document.getElementById('ocrRow')?.remove();
+            renderRefundManual({ ticketId:'NT-REF-'+rnd(), txnId:'UNKNOWN' });
+        }
+    }
+
+    function renderRefundSuccess(r) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="tcard">
+        <div class="tbadge">✅ REFUND INITIATED</div>
+        <div class="trow"><span class="tlabel">Ticket ID</span><strong>${esc(r.ticketId)}</strong></div>
+        <div class="trow"><span class="tlabel">Transaction ID</span><span>${esc(r.txnId||'—')}</span></div>
+        <div class="trow"><span class="tlabel">Amount</span><strong>₹${esc(r.amount||'—')}</strong></div>
+        <div class="trow"><span class="tlabel">Expected Credit</span><strong>${esc(r.timeline||'3-5 days')}</strong></div>
+        <div class="trow"><span class="tlabel">Status</span><span class="status-ok">Processing</span></div>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">📧 Confirmation email sent. SMS alert will follow.</div>
+      <div class="chips" style="margin-top:8px">
+        <div class="chip" onclick="showAgentCard()">Need more help?</div>
+        <div class="chip" onclick="resetHome()">Home</div>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    function renderRefundManual(r) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="tcard" style="background:#fffbeb;border-color:#fde68a">
+        <div class="tbadge" style="background:#f59e0b">⚠️ MANUAL REVIEW</div>
+        <div class="trow"><span class="tlabel">Ticket ID</span><strong>${esc(r.ticketId)}</strong></div>
+        <div class="trow"><span class="tlabel">Transaction ID</span><span>${esc(r.txnId||'Unreadable')}</span></div>
+        <div class="trow"><span class="tlabel">Status</span><span class="status-warn">Forwarded to Support</span></div>
+      </div>
+      <div style="font-size:12px;color:#92400e;margin-top:8px;background:#fef3c7;padding:10px;border-radius:10px;border:1px solid #fde68a">
+        📧 Your case has been emailed to <strong>support@nutritap.in</strong> with your screenshot. Response within <strong>24 hours</strong>.
+      </div>
+      <div class="chips" style="margin-top:8px">
+        <div class="chip amber" onclick="showAgentCard()">Talk to Agent</div>
+        <div class="chip" onclick="resetHome()">Home</div>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    function renderRefundFailed(r) {
+        botMsg(`❌ <strong>Could not process automatically.</strong><br/>${esc(r.message||'')}<br/>
+    Reference: <strong>${esc(r.ticketId)}</strong> — our team will contact you.
+    <div class="chips" style="margin-top:8px">
+      <div class="chip red" onclick="showAgentCard()">Connect Agent</div>
+      <div class="chip" onclick="resetHome()">Home</div>
+    </div>`);
+    }
+
+    // ═══════════════════════════════════════
+    //  KIOSK FLOW
+    // ═══════════════════════════════════════
+    function showKioskMenu() {
+        botMsg(`🏧 Kiosk Support — what's the issue?
+    <div class="chips" style="margin-top:10px">
+      <div class="chip" onclick="aiQuery('The kiosk is not dispensing my item')">Not dispensing</div>
+      <div class="chip" onclick="aiQuery('Kiosk screen is frozen or not responding')">Screen frozen</div>
+      <div class="chip red" onclick="aiQuery('Payment deducted but kiosk did not give item')">Paid, no item</div>
+      <div class="chip red" onclick="aiQuery('Kiosk is offline or showing error')">Kiosk offline</div>
+      <div class="chip" onclick="aiQuery('How to find nearest NutriTap kiosk?')">Find kiosk</div>
+      <div class="chip amber" onclick="showKioskReport()">Report a problem</div>
+    </div>`, false);
+    }
+
+    function showKioskReport() {
+        userMsg('🔧 Report a kiosk problem');
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="bubble-bot">
+        <div class="scard-title">🏧 Kiosk Issue Report</div>
+        <input class="finput" id="k-loc"  placeholder="📍 Kiosk location / address"/>
+        <input class="finput" id="k-mid"  placeholder="🔢 Machine ID (on kiosk sticker, optional)"/>
+        <select class="finput" id="k-type">
+          <option value="">Select issue type…</option>
+          <option>Machine not dispensing</option>
+          <option>Payment stuck / not accepted</option>
+          <option>Screen not working</option>
+          <option>Machine offline / out of order</option>
+          <option>Wrong product dispensed</option>
+          <option>Product expired / quality issue</option>
+          <option>Other technical issue</option>
+        </select>
+        <textarea class="finput" id="k-desc" placeholder="Describe briefly…" rows="3" style="resize:none"></textarea>
+        <button class="fbtn" onclick="submitKioskReport()">Submit Report</button>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    function submitKioskReport() {
+        const loc  = document.getElementById('k-loc')?.value?.trim();
+        const mid  = document.getElementById('k-mid')?.value?.trim();
+        const type = document.getElementById('k-type')?.value;
+        const desc = document.getElementById('k-desc')?.value?.trim();
+
+        if (!loc || !type) { alert('Please fill location and issue type.'); return; }
+        userMsg(`Location: ${loc} | Issue: ${type}`);
+
+        $.ajax({
+            url: '/kiosk/report', method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ location:loc, machineId:mid, issueType:type, description:desc }),
+            success: function(data) { renderKioskTicket(data.ticketId, loc, type); },
+            error:   function()     { renderKioskTicket('NT-KSK-'+rnd(), loc, type); }
         });
     }
 
-    // Enter Key Support
-    $('#userInput').on('keypress', function(e) {
-        if(e.which == 13) send();
+    function renderKioskTicket(ticketId, loc, type) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="ki-card">
+        <h4>✅ Kiosk Issue Reported</h4>
+        <div class="ki-row"><div class="ki-icon">🎫</div><div><strong>${esc(ticketId)}</strong><br/><span style="font-size:11px;color:var(--muted)">Ticket number</span></div></div>
+        <div class="ki-row"><div class="ki-icon">📍</div><div>${esc(loc)}</div></div>
+        <div class="ki-row"><div class="ki-icon">⚠️</div><div>${esc(type)}</div></div>
+        <div class="ki-row"><div class="ki-icon">⏱</div><div>Technician assigned within <strong>4-6 hours</strong></div></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">If money was deducted, refund will be auto-initiated within 24 hours.</div>
+      <div class="chips" style="margin-top:8px">
+        <div class="chip red" onclick="showRefundMenu()">Claim Refund</div>
+        <div class="chip" onclick="showAgentCard()">Talk to Agent</div>
+        <div class="chip" onclick="resetHome()">Home</div>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    // ═══════════════════════════════════════
+    //  FRANCHISE FLOW
+    // ═══════════════════════════════════════
+    function showFranchiseForm() {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="bubble-bot">
+        <div class="scard-title">🤝 Franchise Enquiry</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+          Partner with NutriTap. Our team will call you within <strong>48 hours</strong>.
+        </p>
+        <input class="finput" id="f-name"  placeholder="👤 Full Name"/>
+        <input class="finput" id="f-email" placeholder="📧 Email Address" type="email"/>
+        <input class="finput" id="f-phone" placeholder="📱 Mobile Number" type="tel"/>
+        <input class="finput" id="f-city"  placeholder="🏙 City of interest"/>
+        <select class="finput" id="f-invest">
+          <option value="">Investment range…</option>
+          <option>₹2–5 Lakhs (1 Kiosk)</option>
+          <option>₹5–10 Lakhs (2–3 Kiosks)</option>
+          <option>₹10–25 Lakhs (4–10 Kiosks)</option>
+          <option>₹25 Lakhs+ (Multi-city)</option>
+        </select>
+        <select class="finput" id="f-loc">
+          <option value="">Preferred location type…</option>
+          <option>Office / Corporate Park</option>
+          <option>Hospital / Healthcare</option>
+          <option>Airport / Railway Station</option>
+          <option>Mall / Retail Complex</option>
+          <option>Educational Institution</option>
+          <option>Residential Society</option>
+        </select>
+        <textarea class="finput" id="f-msg" placeholder="Any questions? (optional)" rows="2" style="resize:none"></textarea>
+        <button class="fbtn" onclick="submitFranchise()">Submit Enquiry →</button>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    function submitFranchise() {
+        const name  = document.getElementById('f-name')?.value?.trim();
+        const email = document.getElementById('f-email')?.value?.trim();
+        const phone = document.getElementById('f-phone')?.value?.trim();
+        const city  = document.getElementById('f-city')?.value?.trim();
+
+        if (!name || !email || !city) { alert('Please fill Name, Email and City.'); return; }
+        userMsg(`Franchise enquiry: ${name} · ${city}`);
+
+        $.ajax({
+            url: '/franchise/enquiry', method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                name, email, phone, city,
+                invest:       document.getElementById('f-invest')?.value,
+                locationType: document.getElementById('f-loc')?.value,
+                message:      document.getElementById('f-msg')?.value?.trim()
+            }),
+            success: d => renderFranchiseTicket(d.refId, name, email, city),
+            error:   () => renderFranchiseTicket('NT-FRAN-'+rnd(), name, email, city)
+        });
+    }
+
+    function renderFranchiseTicket(refId, name, email, city) {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="tcard" style="background:#eff6ff;border-color:#bfdbfe">
+        <div class="tbadge" style="background:#2563eb">🤝 ENQUIRY RECEIVED</div>
+        <div class="trow"><span class="tlabel">Reference ID</span><strong>${esc(refId)}</strong></div>
+        <div class="trow"><span class="tlabel">Name</span><span>${esc(name)}</span></div>
+        <div class="trow"><span class="tlabel">City</span><span>${esc(city)}</span></div>
+        <div class="trow"><span class="tlabel">Response in</span><strong style="color:#2563eb">48 hours</strong></div>
+      </div>
+      <div style="font-size:12px;color:#1e40af;margin-top:8px;background:#dbeafe;padding:10px;border-radius:10px;border:1px solid #bfdbfe">
+        📧 Franchise brochure sent to <strong>${esc(email)}</strong>.<br/>
+        Our team will call you within 48 hours.
+      </div>
+      <div class="chips" style="margin-top:8px">
+        <div class="chip" onclick="aiQuery('What is NutriTap franchise ROI?')">Learn about ROI</div>
+        <div class="chip" onclick="resetHome()">Home</div>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    // ═══════════════════════════════════════
+    //  AGENT ESCALATION
+    // ═══════════════════════════════════════
+    function showAgentCard() {
+        document.getElementById('chatWin').insertAdjacentHTML('beforeend',
+            `<div class="row-bot fade"><div class="mini-av">NT</div><div>
+      <div class="agent-card">
+        <div style="font-size:32px">🎧</div>
+        <div>
+          <h4>Connect to Live Agent</h4>
+          <p>Available Mon–Sat · 9 AM – 7 PM IST<br/>Avg. wait: <strong>~3 minutes</strong></p>
+          <button class="agent-btn" onclick="connectAgent()">Connect Now</button>
+        </div>
+      </div>
+      <div class="ts l">${now()}</div>
+    </div></div>`);
+        scroll();
+    }
+
+    function connectAgent() {
+        botMsg(`✅ <strong>Connecting you to a live agent…</strong><br/><br/>
+    Reference: <strong>NT-AGT-${rnd()}</strong><br/>
+    You will receive a call or WhatsApp within <strong>3 minutes</strong>.
+    <div class="chips" style="margin-top:8px"><div class="chip" onclick="resetHome()">Home</div></div>`);
+    }
+
+    // ═══════════════════════════════════════
+    //  AI QUERY
+    // ═══════════════════════════════════════
+    function aiQuery(q) { userMsg(q); callAI(q); }
+
+    function send() {
+        const inp = document.getElementById('uInput');
+        const q   = inp.value.trim();
+        if (!q) return;
+        userMsg(q); inp.value = ''; inp.style.height = 'auto';
+        callAI(q);
+    }
+
+    function callAI(q) {
+        const tid = showThink();
+        document.getElementById('sBtn').disabled = true;
+
+        $.ajax({
+            url: '/chat', method: 'POST',
+            data: { q, sessionId },
+            success: function(data) {
+                rmThink(tid);
+                document.getElementById('sBtn').disabled = false;
+                const low = q.toLowerCase();
+                let extra = '';
+                if (low.match(/refund|money|payment|charge/))
+                    extra = `<div class="chips" style="margin-top:8px"><div class="chip red" onclick="showRefundMenu()">Start Refund</div><div class="chip" onclick="showAgentCard()">Talk to Agent</div></div>`;
+                else if (low.match(/kiosk|machine|dispens|screen/))
+                    extra = `<div class="chips" style="margin-top:8px"><div class="chip" onclick="showKioskReport()">Report Issue</div><div class="chip" onclick="showAgentCard()">Talk to Agent</div></div>`;
+                else if (low.match(/franchise|partner|invest/))
+                    extra = `<div class="chips" style="margin-top:8px"><div class="chip" onclick="showFranchiseForm()">Apply Now</div></div>`;
+                botMsg(fmt(data) + extra);
+            },
+            error: function() {
+                rmThink(tid);
+                document.getElementById('sBtn').disabled = false;
+                botMsg(`⚠️ Connection issue. <span style="color:var(--g);cursor:pointer;font-weight:600" onclick="showAgentCard()">Talk to a live agent</span>.`);
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════
+    //  RESET + REFRESH
+    // ═══════════════════════════════════════
+    function resetHome() {
+        uploadedFile = null; uploadedB64 = null;
+        botMsg(`🏠 <strong>Back to main menu.</strong>
+    <div class="menu3" style="margin-top:10px">
+      <div class="mcard" onclick="selectMenu('refund')">
+        <div class="mcard-icon" style="background:#fef2f2">💰</div>
+        <div><div class="mcard-title">Refund &amp; Billing</div><div class="mcard-sub">Screenshot · Auto refund · Tracking</div></div>
+        <div class="mcard-arr">›</div>
+      </div>
+      <div class="mcard" onclick="selectMenu('kiosk')">
+        <div class="mcard-icon" style="background:#f0fdf4">🏧</div>
+        <div><div class="mcard-title">Kiosk Support</div><div class="mcard-sub">Machine issues · Report · Tech help</div></div>
+        <div class="mcard-arr">›</div>
+      </div>
+      <div class="mcard" onclick="selectMenu('franchise')">
+        <div class="mcard-icon" style="background:#eff6ff">🤝</div>
+        <div><div class="mcard-title">Franchise Enquiry</div><div class="mcard-sub">Partner with us · Investment info</div></div>
+        <div class="mcard-arr">›</div>
+      </div>
+      <div class="mcard" onclick="selectMenu('general')">
+        <div class="mcard-icon" style="background:#fdf4ff">💬</div>
+        <div><div class="mcard-title">General Queries</div><div class="mcard-sub">Products · Nutrition · FAQs</div></div>
+        <div class="mcard-arr">›</div>
+      </div>
+    </div>`, false);
+    }
+
+    function triggerRefresh() {
+        document.getElementById('rStrip').style.display = 'flex';
+        $.post('/admin/refresh', function() {
+            document.getElementById('rStrip').style.display = 'none';
+            botMsg('✅ Knowledge base refreshed with latest NutriTap data!');
+        }).fail(() => { document.getElementById('rStrip').style.display = 'none'; });
+    }
+
+    // Enter to send
+    document.getElementById('uInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
 </script>
+</body>
+</html>

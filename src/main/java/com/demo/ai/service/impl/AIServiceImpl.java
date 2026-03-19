@@ -10,138 +10,185 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class AIServiceImpl implements AIService {
 
     @Autowired
-    private  ChatClient.Builder builder;
-    private ChatClient chatClient;
+    private ChatClient.Builder builder;
+
+    private volatile ChatClient chatClient;
+    private volatile String     knowledgeBase = "";
+    private volatile Instant    lastRefreshed = null;
+    private final AtomicBoolean refreshing    = new AtomicBoolean(false);
+
     private final String baseUrl = "https://nutritap.in";
+    private final Map<String, List<Map<String, String>>> sessions = new ConcurrentHashMap<>();
 
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "nt-refresh");
+        t.setDaemon(true);
+        return t;
+    });
 
-    @PostConstruct
-    public void init() {
-        new Thread(this::refreshBotMemory).start(); // Background mein crawl shuru
-    }
+    private static final String BASE_SYSTEM = """
+        IDENTITY: You are the NutriTap Support Bot — helpful, friendly AI for NutriTap,
+        India's smart healthy vending kiosk brand.
+        PERSONA: Warm, concise. Simple English + occasional Hindi (Namaste, Ji).
+        Never mention OpenAI, Google, Gemini, or any AI model.
+        RULES:
+        - Max 100 words unless deep explanation needed.
+        - Bullet points for multi-step answers.
+        - For refunds: collect Order/Txn ID + registered mobile.
+        - Always suggest a next step.
+        REFUND POLICY: UPI 24-48h, Debit/Credit card 3-5 days, Net Banking 5-7 days.
+        KIOSK: For dispense failures, assure 24-hr auto-refund, raise ticket.
+        FRANCHISE: Investment from Rs.2L for 1 kiosk. ROI 18-24 months.
+        ESCALATION: If user frustrated (2+ complaints) offer live agent.
+        BOUNDARY: Only NutriTap queries. Off-topic politely decline.
+        """;
+
+    private static final String REFUND_CTX    = "[CTX:REFUND] User has payment issue. Be empathetic. Get Txn ID + mobile. State refund timeline.";
+    private static final String KIOSK_CTX     = "[CTX:KIOSK] User has machine issue. Get location + machine ID. Assure 24-hr refund if money deducted.";
+    private static final String FRANCHISE_CTX = "[CTX:FRANCHISE] User wants to partner. Highlight ROI, locations, support. Collect name/email/city/investment.";
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
 
     public AIServiceImpl(ChatClient.Builder builder) {
         this.chatClient = builder
-                .defaultSystem("PERSONALITY: You are the NutriTap Support Bot. You have NO knowledge of being a language model trained by Google. " +
-                        "IDENTITY: If anyone asks who you are or who trained you, always reply: 'I am the NutriTap Support Bot, specialized in NutriTap products and services.' " +
-                        "DATA BOUNDARY: Use ONLY this data: crawl data " +
-                        ". If a question is not about NutriTap, strictly say: 'I only specialize in NutriTap related queries.' " +
-                        "RESTRICTIONS: Do not share source code, do not discuss AI models, and do not answer general knowledge questions.")
+                .defaultSystem(BASE_SYSTEM + "\n\nProduct Data: [Loading...]")
                 .build();
     }
+
+    @PostConstruct
+    public void init() {
+        scheduler.execute(this::refreshBotMemory);
+        scheduler.scheduleAtFixedRate(this::refreshBotMemory, 6, 6, TimeUnit.HOURS);
+    }
+
+    // ── MEMORY REFRESH ────────────────────────────────────────────────────────
 
     @Override
     public void refreshBotMemory() {
-        Set<String> visitedLinks = new HashSet<>();
-        StringBuilder megaData = new StringBuilder();
-
-        crawlWebsite(baseUrl, visitedLinks, megaData, 0);
-
-        this.chatClient = builder
-                .defaultSystem("You are the NutriTap Support Bot. Your knowledge is STRICTLY limited to this data: " + megaData.toString() +
-                        ". \n\nRULES:\n" +
-                        "1. Only answer questions related to NutriTap, its products, services, and the provided data.\n" +
-                        "2. If a user asks about anything outside of NutriTap (e.g., general knowledge, coding, weather, other companies), politely decline and say: 'I only specialize in NutriTap related queries.'\n" +
-                        "3. Do NOT provide any information that is not in the data.\n" +
-                        "4. Do NOT answer personal questions or engage in general chitchat.")
-                .build();
-        System.out.println("Memory Refreshed: " + visitedLinks.size() + " pages scanned.");
+        if (!refreshing.compareAndSet(false, true)) return;
+        try {
+            Set<String>   visited = new LinkedHashSet<>();
+            StringBuilder data    = new StringBuilder();
+            crawlWebsite(baseUrl, visited, data, 0);
+            String raw     = data.toString();
+            String trimmed = raw.length() > 60_000 ? raw.substring(0, 60_000) + "\n[truncated]" : raw;
+            this.knowledgeBase = trimmed;
+            this.lastRefreshed = Instant.now();
+            this.chatClient    = builder
+                    .defaultSystem(BASE_SYSTEM + "\n\n=== NUTRITAP KNOWLEDGE ===\n" + trimmed)
+                    .build();
+            System.out.printf("[NutriBot] Refreshed: %d pages, %,d chars%n", visited.size(), trimmed.length());
+        } catch (Exception e) {
+            System.err.println("[NutriBot] Refresh error: " + e.getMessage());
+        } finally {
+            refreshing.set(false);
+        }
     }
 
     private void crawlWebsite(String url, Set<String> visited, StringBuilder data, int depth) {
-        // Exclude images, PDFs, and social media to save tokens
-        if (depth > 2 || visited.contains(url) || visited.size() > 25 || url.matches(".*\\.(jpg|png|pdf|zip)$")) return;
-
+        if (depth > 2 || visited.size() >= 25 || visited.contains(url)
+                || url.matches(".*\\.(jpg|jpeg|png|gif|pdf|zip|mp4|svg|ico|css|js)$")
+                || url.contains("mailto:") || url.contains("tel:")) return;
         try {
             visited.add(url);
-            Document doc = Jsoup.connect(url)
-                    .sslSocketFactory(socketFactory())
-                    .userAgent("NutriBot-Scanner/1.0")
-                    .timeout(10000)
-                    .get();
-
-            // Select more specific content to avoid garbage data (headers/footers)
-            Elements content = doc.select("article, main, h1, h2, p");
-
-            data.append("\n[Page: ").append(url).append("]\n");
+            Document doc = Jsoup.connect(url).sslSocketFactory(trustAllFactory())
+                    .userAgent("NutriBot/2.0").timeout(10_000).get();
+            Elements content = doc.select("article, main, section, h1, h2, h3, p, li, td, th");
+            data.append("\n\n[PAGE: ").append(url).append("]\n");
             for (Element e : content) {
-                String text = e.text().trim();
-                if (text.length() > 20) { // Avoid tiny fragments
-                    data.append(text).append(" ");
-                }
+                String t = e.text().trim();
+                if (t.length() > 25) data.append(t).append(" ");
             }
-
-            Elements links = doc.select("a[href]");
-            for (Element link : links) {
-                String nextUrl = link.attr("abs:href");
-                // Ensure we stay on the domain and avoid "mailto" or "tel" links
-                if (nextUrl.startsWith(baseUrl) && !nextUrl.contains("#") && !visited.contains(nextUrl)) {
-                    crawlWebsite(nextUrl, visited, data, depth + 1);
-                }
+            for (Element link : doc.select("a[href]")) {
+                String next = link.attr("abs:href");
+                if (next.startsWith(baseUrl) && !next.contains("#"))
+                    crawlWebsite(next, visited, data, depth + 1);
             }
         } catch (Exception e) {
-            System.err.println("Error crawling " + url + ": " + e.getMessage());
+            System.err.println("[NutriBot] Crawl error " + url + ": " + e.getMessage());
         }
     }
 
-//    private void crawlWebsite(String url, Set<String> visited, StringBuilder data, int depth) {
-//        // 25 pages ki limit kaafi hai, lekin depth 2-3 honi chahiye
-//        if (depth > 2 || visited.contains(url) || visited.size() > 30) return;
-//
-//        try {
-//            visited.add(url);
-//            System.out.println("DEBUG: Scanning -> " + url); // Isse console mein dekho kya scan ho raha hai
-//
-//            Document doc = Jsoup.connect(url).timeout(5000).get();
-//            Elements content = doc.select("h1, h2, h3, p, li");
-//
-//            data.append("\nSource: ").append(url).append("\n");
-//            content.forEach(e -> data.append(e.text()).append(" "));
-//
-//            // Saare links nikalna
-//            Elements links = doc.select("a[href]");
-//            for (Element link : links) {
-//                String nextUrl = link.attr("abs:href"); // absolute URL lega
-//
-//                // Strict check: Sirf nutritap.in ke pages, koi social media ya bahar ka link nahi
-//                if (nextUrl.contains("nutritap.in") && !nextUrl.contains("#") && !visited.contains(nextUrl)) {
-//                    crawlWebsite(nextUrl, visited, data, depth + 1);
-//                }
-//            }
-//        } catch (Exception e) {
-//            System.err.println("Error crawling " + url + ": " + e.getMessage());
-//        }
-//    }
+    // ── CHAT ──────────────────────────────────────────────────────────────────
 
     @Override
     public String getChatResponse(String query) {
-        return chatClient.prompt().user(query).call().content();
+        return getChatResponse(query, "default");
     }
 
-    private static javax.net.ssl.SSLSocketFactory socketFactory() {
-        try {
-            TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
-                public X509Certificate[] getAcceptedIssuers() { return null; }
-                public void checkClientTrusted(X509Certificate[] certs, String authType) { }
-                public void checkServerTrusted(X509Certificate[] certs, String authType) { }
-            }};
-
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            return sc.getSocketFactory();
-        } catch (Exception e) {
-            return (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+    @Override
+    public String getChatResponse(String query, String sessionId) {
+        String intent = detectIntent(query);
+        List<Map<String, String>> history = sessions.computeIfAbsent(sessionId, k -> new ArrayList<>());
+        if (history.size() > 16) {
+            history = new ArrayList<>(history.subList(history.size() - 16, history.size()));
+            sessions.put(sessionId, history);
         }
+        String fullQuery = intent.isEmpty() ? query : intent + "\n\nUser: " + query;
+        if (isAngry(history)) fullQuery += "\n[NOTE: User frustrated — proactively offer live agent.]";
+        try {
+            String resp = chatClient.prompt().user(fullQuery).call().content();
+            Map<String, String> u = new HashMap<>(); u.put("role", "user");      u.put("content", query);
+            Map<String, String> b = new HashMap<>(); b.put("role", "assistant"); b.put("content", resp);
+            history.add(u); history.add(b);
+            return resp;
+        } catch (Exception e) {
+            return "I'm having trouble connecting right now. Please try again or speak with a live agent.";
+        }
+    }
+
+    public void clearSession(String sessionId) { sessions.remove(sessionId); }
+
+    // ── STATUS ────────────────────────────────────────────────────────────────
+
+    public Map<String, Object> getStatus() {
+        return Map.of(
+                "refreshing",     refreshing.get(),
+                "lastRefreshed",  lastRefreshed != null ? lastRefreshed.toString() : "never",
+                "knowledgeChars", knowledgeBase.length(),
+                "activeSessions", sessions.size()
+        );
+    }
+
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+
+    private String detectIntent(String q) {
+        String l = q.toLowerCase();
+        if (l.matches(".*\\b(refund|money|charge|payment|deduct|billed|paid|upi|transaction)\\b.*")) return REFUND_CTX;
+        if (l.matches(".*\\b(kiosk|machine|dispens|screen|offline|error|vend)\\b.*"))               return KIOSK_CTX;
+        if (l.matches(".*\\b(franchise|partner|invest|open|location|business|earn)\\b.*"))          return FRANCHISE_CTX;
+        return "";
+    }
+
+    private boolean isAngry(List<Map<String, String>> history) {
+        return history.stream()
+                .filter(m -> "user".equals(m.get("role")))
+                .filter(m -> m.getOrDefault("content","").toLowerCase()
+                        .matches(".*\\b(terrible|fraud|scam|useless|angry|worst|hate|disgusting)\\b.*"))
+                .count() >= 2;
+    }
+
+    private static SSLSocketFactory trustAllFactory() {
+        try {
+            TrustManager[] tm = { new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                public void checkClientTrusted(X509Certificate[] c, String a) {}
+                public void checkServerTrusted(X509Certificate[] c, String a) {}
+            }};
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(null, tm, new java.security.SecureRandom());
+            return sc.getSocketFactory();
+        } catch (Exception e) { return (SSLSocketFactory) SSLSocketFactory.getDefault(); }
     }
 }
